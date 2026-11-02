@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Block World Planner — STRIPS &amp; Goal Stack Planning</title>
+  <meta name="description" content="An interactive Blocks World planner: set an initial state and a goal, then watch STRIPS Goal Stack Planning find and execute the actions.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Crect x='7' y='18' width='18' height='7' rx='2' fill='%23ffffff'/%3E%3Crect x='10' y='10' width='12' height='7' rx='2' fill='%23bfdbfe'/%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<!-- ============================ navbar ============================ -->
+<header class="nav">
+  <div class="container nav-inner">
+    <button class="brand" type="button" data-nav="planner" aria-label="Block World Planner — go to the planner">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="32" height="32"><rect width="32" height="32" rx="8" fill="#2563eb"/><rect x="7" y="18" width="18" height="7" rx="2" fill="#fff"/><rect x="10" y="10" width="12" height="7" rx="2" fill="#bfdbfe"/></svg>
+      </span>
+      <span class="brand-text">
+        <strong>Block World</strong>
+        <span>Planning Simulator</span>
+      </span>
+    </button>
+
+    <button class="nav-toggle" type="button" id="nav-toggle" aria-expanded="false" aria-controls="nav-links">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      <span class="sr-only">Menu</span>
+    </button>
+
+    <nav class="nav-links" id="nav-links" aria-label="Main">
+      <button class="nav-link is-active" type="button" data-nav="planner" aria-current="page">Planner</button>
+      <button class="nav-link" type="button" data-nav="how">How It Works</button>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ==================================================================
+       PAGE 1 — the planner
+       ================================================================== -->
+  <section class="view" id="view-planner" data-view="planner">
+
+    <div class="container">
+
+      <div class="page-head">
+        <div>
+          <h1>Blocks World Planner</h1>
+          <p class="lede">Give the robot a start state and a goal. Goal Stack Planning decides the order of actions — you only press play.</p>
+        </div>
+        <label class="field field-inline">
+          <span class="field-label">Example</span>
+          <select id="example-select">
+            <option value="">Load an example…</option>
+            <option value="simple">Simple Tower</option>
+            <option value="reverse">Reverse Tower</option>
+            <option value="sussman">Sussman Anomaly</option>
+          </select>
+        </label>
+      </div>
+
+      <!-- ---------- set up ---------- -->
+      <section class="panel-section" aria-labelledby="setup-title">
+        <div class="section-head">
+          <div>
+            <h2 id="setup-title">Set up</h2>
+            <p>Every block sits either on the table or on one other block. Both cards are the input to the planner.</p>
+          </div>
+          <label class="field field-inline">
+            <span class="field-label">Blocks</span>
+            <select id="block-count">
+              <option value="3">3</option>
+              <option value="4" selected>4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="grid grid-2">
+          <article class="card">
+            <header class="card-head">
+              <h3>Initial state</h3>
+              <span class="tag">start</span>
+            </header>
+            <div id="initial-diagram" class="stage stage-md is-setup" aria-label="Initial arrangement"></div>
+            <div id="initial-controls" class="support-grid"></div>
+          </article>
+
+          <article class="card">
+            <header class="card-head">
+              <h3>Goal state</h3>
+              <span class="tag">target</span>
+            </header>
+            <div id="goal-diagram" class="stage stage-md is-setup" aria-label="Goal arrangement"></div>
+            <div id="goal-controls" class="support-grid"></div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ---------- simulation ---------- -->
+      <section class="panel-section" aria-labelledby="sim-title">
+        <div class="section-head">
+          <div>
+            <h2 id="sim-title">Simulation</h2>
+            <p>The picture is drawn from the STRIPS state, so it can never disagree with the logic.</p>
+          </div>
+          <span class="step-badge" id="step-badge">Step 0 of 0</span>
+        </div>
+
+        <article class="card card-sim">
+          <div id="current-diagram" class="stage stage-lg" aria-label="Current state with the robot arm"></div>
+
+          <div class="sim-foot">
+            <span class="mono" id="current-action">No action executed yet</span>
+            <span class="muted" id="current-hint">Generate a plan to start.</span>
+          </div>
+
+          <div class="banner" id="banner" hidden>
+            <span class="banner-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9.5 18 20 6.5"/></svg>
+            </span>
+            <div class="banner-body">
+              <strong id="banner-title">Goal reached</strong>
+              <p id="banner-text"></p>
+            </div>
+            <div class="chips chips-sm" id="banner-chips"></div>
+          </div>
+        </article>
+      </section>
+
+      <!-- ---------- internals ---------- -->
+      <section class="panel-section" aria-labelledby="internals-title">
+        <div class="section-head">
+          <div>
+            <h2 id="internals-title">Planner internals</h2>
+            <p>The stack, the plan and the state — updated on every step.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-3">
+          <article class="card panel-card">
+            <header class="card-head">
+              <h3>Goal stack</h3>
+              <span class="tag tag-quiet">top first</span>
+            </header>
+            <div id="goal-stack" class="stack-list"></div>
+            <p class="card-note mono" id="stack-note" hidden></p>
+          </article>
+
+          <article class="card panel-card">
+            <header class="card-head">
+              <h3>Generated plan</h3>
+              <span class="tag tag-quiet" id="plan-count">0 actions</span>
+            </header>
+            <div id="plan-list" class="plan-list" role="list"></div>
+          </article>
+
+          <article class="card panel-card">
+            <header class="card-head">
+              <h3>Predicates</h3>
+              <span class="tag tag-quiet" id="predicate-count">0</span>
+            </header>
+            <div id="predicates" class="chips"></div>
+            <p class="card-note"><span class="dot dot-added"></span>added <span class="dot dot-deleted"></span>deleted by the last action</p>
+          </article>
+        </div>
+      </section>
+    </div>
+
+    <!-- ---------- sticky control bar ---------- -->
+    <div class="controls">
+      <div class="container controls-inner">
+        <div class="controls-buttons">
+          <button id="btn-generate" class="btn btn-primary" type="button">Generate Plan</button>
+          <button id="btn-step" class="btn" type="button" disabled>Step ▶</button>
+          <button id="btn-run" class="btn" type="button" disabled>Run All ▶▶</button>
+          <button id="btn-reset" class="btn btn-quiet" type="button" disabled>Reset</button>
+        </div>
+        <label class="speed">
+          <span class="field-label">Speed</span>
+          <input id="speed" type="range" min="1" max="5" step="1" value="3" aria-label="Run All speed">
+        </label>
+        <p class="status-line" id="status" role="status">Ready — set both states, then generate a plan.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================================
+       PAGE 2 — how it works
+       ================================================================== -->
+  <section class="view" id="view-how" data-view="how" hidden>
+    <div class="container">
+
+      <div class="page-head">
+        <div>
+          <h1>How it works</h1>
+          <p class="lede">Blocks World, five predicates, four operators, one stack.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <article class="card prose">
+          <h3>What is Blocks World?</h3>
+          <p>
+            Blocks World is the classic toy planning problem. A robot arm can pick up one block at a time
+            and move it. Blocks rest on the table or on other blocks, and the arm can only take a block
+            that has nothing on top of it. The question is: which moves take us from the start picture to
+            the goal picture?
+          </p>
+          <p>
+            Its size makes it perfect for studying planning — a few blocks already produce thousands of
+            possible states, but the rules fit on one page.
+          </p>
+        </article>
+
+        <article class="card diagram-card">
+          <h3>A picture and its meaning</h3>
+          <div class="mini-stage" aria-hidden="true">
+            <div class="mini-tower">
+              <span class="blk blk-mini" style="--blk-bg:#8fb6f2">A</span>
+              <span class="blk blk-mini" style="--blk-bg:#f6b0a8">B</span>
+            </div>
+            <div class="mini-tower">
+              <span class="blk blk-mini" style="--blk-bg:#9ed8ac">C</span>
+            </div>
+          </div>
+          <ul class="plain-list mono">
+            <li>ON(A,B)</li>
+            <li>ONTABLE(B)</li>
+            <li>ONTABLE(C)</li>
+            <li>CLEAR(A)</li>
+            <li>CLEAR(C)</li>
+            <li>ARMEMPTY</li>
+          </ul>
+        </article>
+      </div>
+
+      <section class="panel-section" aria-labelledby="predicates-title">
+        <div class="section-head">
+          <div>
+            <h2 id="predicates-title">The five predicates</h2>
+            <p>Everything the planner knows about the world is written with these.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-5">
+          <article class="card mini-card">
+            <code class="chip chip-static">ON(A,B)</code>
+            <p>Block A sits directly on block B.</p>
+          </article>
+          <article class="card mini-card">
+            <code class="chip chip-static">ONTABLE(C)</code>
+            <p>Block C sits directly on the table.</p>
+          </article>
+          <article class="card mini-card">
+            <code class="chip chip-static">CLEAR(A)</code>
+            <p>Nothing is on top of A, so the arm can take it.</p>
+          </article>
+          <article class="card mini-card">
+            <code class="chip chip-static">HOLDING(B)</code>
+            <p>The arm is holding block B.</p>
+          </article>
+          <article class="card mini-card">
+            <code class="chip chip-static">ARMEMPTY</code>
+            <p>The arm holds nothing.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel-section" aria-labelledby="operators-title">
+        <div class="section-head">
+          <div>
+            <h2 id="operators-title">The four operators</h2>
+            <p>Each operator is a precondition list, an add list and a delete list — that is all STRIPS needs.</p>
+          </div>
+        </div>
+
+        <div class="card table-card">
+          <div class="table-scroll">
+            <table class="op-table">
+              <thead>
+                <tr>
+                  <th scope="col">Operator</th>
+                  <th scope="col">Preconditions</th>
+                  <th scope="col">Add list</th>
+                  <th scope="col">Delete list</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row"><code>PICKUP(x)</code></th>
+                  <td class="mono">ONTABLE(x), CLEAR(x), ARMEMPTY</td>
+                  <td class="mono add">HOLDING(x)</td>
+                  <td class="mono del">ONTABLE(x), CLEAR(x), ARMEMPTY</td>
+                </tr>
+                <tr>
+                  <th scope="row"><code>PUTDOWN(x)</code></th>
+                  <td class="mono">HOLDING(x)</td>
+                  <td class="mono add">ONTABLE(x), CLEAR(x), ARMEMPTY</td>
+                  <td class="mono del">HOLDING(x)</td>
+                </tr>
+                <tr>
+                  <th scope="row"><code>STACK(x,y)</code></th>
+                  <td class="mono">HOLDING(x), CLEAR(y)</td>
+                  <td class="mono add">ON(x,y), CLEAR(x), ARMEMPTY</td>
+                  <td class="mono del">HOLDING(x), CLEAR(y)</td>
+                </tr>
+                <tr>
+                  <th scope="row"><code>UNSTACK(x,y)</code></th>
+                  <td class="mono">ON(x,y), CLEAR(x), ARMEMPTY</td>
+                  <td class="mono add">HOLDING(x), CLEAR(y)</td>
+                  <td class="mono del">ON(x,y), CLEAR(x), ARMEMPTY</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel-section" aria-labelledby="steps-title">
+        <div class="section-head">
+          <div>
+            <h2 id="steps-title">Goal Stack Planning in five steps</h2>
+            <p>The planner only ever looks at the top of its own stack.</p>
+          </div>
+        </div>
+
+        <ol class="steps">
+          <li class="card step-card">
+            <span class="step-num">1</span>
+            <div>
+              <h4>Push the goals</h4>
+              <p>The goal conditions go on the stack, first goal on top. The stack now says “what still has to become true”.</p>
+            </div>
+          </li>
+          <li class="card step-card">
+            <span class="step-num">2</span>
+            <div>
+              <h4>Look at the top</h4>
+              <p>If the top is a goal that is already true, pop it — nothing to do. This is the “satisfied, forget it” case.</p>
+            </div>
+          </li>
+          <li class="card step-card">
+            <span class="step-num">3</span>
+            <div>
+              <h4>Choose an operator</h4>
+              <p>If the goal is false, pick an operator that adds it, push that operator, then push its unmet preconditions above it.</p>
+            </div>
+          </li>
+          <li class="card step-card">
+            <span class="step-num">4</span>
+            <div>
+              <h4>Execute a ready operator</h4>
+              <p>When an operator reaches the top, its preconditions have all been handled. Apply its delete list, then its add list, and append it to the plan.</p>
+            </div>
+          </li>
+          <li class="card step-card">
+            <span class="step-num">5</span>
+            <div>
+              <h4>Repair if it broke</h4>
+              <p>If a later step destroyed a precondition of an operator still waiting, that operator goes back on the stack with its missing preconditions pushed above it. When the stack is empty, the plan is done.</p>
+            </div>
+          </li>
+        </ol>
+        <p class="footnote">
+          Goal Stack Planning is not guaranteed to find the shortest plan — it does not search all states.
+          On the Sussman Anomaly it even repeats work, which is exactly why it is worth demonstrating.
+        </p>
+      </section>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <span>Block World Planning Simulator</span>
+    <span class="muted">© <span id="year">2026</span> · STRIPS &amp; Goal Stack Planning</span>
+  </div>
+</footer>
+
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<script src="js/arrangement.js"></script>
+<script src="js/predicates.js"></script>
+<script src="js/actions.js"></script>
+<script src="js/planner.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
